@@ -1,25 +1,21 @@
 pipeline {
     agent any
     environment {
-        // Set AWS credentials and region as environment variables
-        AWS_ACCESS_KEY_ID = credentials('awscreds1')  // Replace with Jenkins credentials ID
-        AWS_SECRET_ACCESS_KEY = credentials('awscreds1')  // Replace with Jenkins credentials ID
-        AWS_DEFAULT_REGION = 'us-east-1'  // Set your preferred AWS region
+        AWS_ACCESS_KEY_ID = credentials('aws-access-key')  // Replace with Jenkins credentials ID for access key
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')  // Replace with Jenkins credentials ID for secret key
+        AWS_DEFAULT_REGION = 'us-east-1'  // Specify the AWS region
     }
     stages {
         stage('Clone Repository') {
             steps {
-                // Clone the repository containing the manage_snapshots.sh script
-                git branch: 'main', url: 'https://github.com/Itachijb93/snapshot-management.git'
+                git branch: 'main', url: 'https://github.com/Itachijb93/snapshot-management.git'  // Ensure this URL is correct
             }
         }
         stage('Run manage_snapshots.sh') {
             steps {
                 script {
-                    // Ensure the script has execute permissions
-                    sh 'chmod +x manage_snapshots.sh'
-                    // Run the manage_snapshots.sh script
-                    sh './manage_snapshots.sh'
+                    sh 'chmod +x manage_snapshots.sh'  // Grant execution permissions to the script
+                    sh './manage_snapshots.sh'  // Execute the script
                 }
             }
         }
@@ -29,7 +25,7 @@ pipeline {
             echo 'Pipeline execution complete.'
         }
         failure {
-            echo 'Pipeline failed. Please check the logs.'
+            echo 'Pipeline failed. Check the logs for details.'
         }
     }
 }
