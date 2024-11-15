@@ -1,53 +1,35 @@
-pipeline {
-    agent any
-    environment {
-        AWS_DEFAULT_REGION = 'us-east-1' // Set the AWS region
-    }
-    stages {
-        stage('Display Snapshots Older than 1 Day') {
-            steps {
-                script {
-                    def filterDate = sh(
-                        script: "date -u -d '1 day ago' +%Y-%m-%dT%H:%M:%S",
-                        returnStdout: true
-                    ).trim()
+#!/bin/bash
 
-                    def snapshots = sh(
-                        script: "aws ec2 describe-snapshots --query \"Snapshots[?StartTime<\\`${filterDate}\\`].{ID:SnapshotId,Start:StartTime}\" --output json",
-                        returnStdout: true
-                    ).trim()
+# Set the number of days to filter snapshots
+DAYS=1
 
-                    if (snapshots == "[]") {
-                        echo "No snapshots older than 1 day found."
-                    } else {
-                        echo "Snapshots older than 1 day: ${snapshots}"
-                    }
-                }
-            }
-        }
-        stage('Delete Snapshots Older than 1 Day') {
-            steps {
-                script {
-                    def filterDate = sh(
-                        script: "date -u -d '1 day ago' +%Y-%m-%dT%H:%M:%S",
-                        returnStdout: true
-                    ).trim()
+# Calculate the date for filtering snapshots (ISO 8601 format)
+FILTER_DATE=$(date -u -d "-$DAYS days" +%Y-%m-%dT%H:%M:%SZ)
 
-                    def snapshotIds = sh(
-                        script: "aws ec2 describe-snapshots --query \"Snapshots[?StartTime<\\`${filterDate}\\`].SnapshotId\" --output text",
-                        returnStdout: true
-                    ).trim().split()
+# Log the filter date for debugging
+echo "Filtering snapshots older than: $FILTER_DATE"
 
-                    if (snapshotIds.isEmpty()) {
-                        echo "No snapshots to delete."
-                    } else {
-                        snapshotIds.each { snapshotId ->
-                            sh "aws ec2 delete-snapshot --snapshot-id ${snapshotId}"
-                            echo "Deleted snapshot: ${snapshotId}"
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+# Fetch snapshot IDs older than the filter date
+SNAPSHOT_IDS=$(aws ec2 describe-snapshots \
+    --filters "Name=start-time,Values=<$FILTER_DATE" \
+    --query "Snapshots[*].SnapshotId" \
+    --output text)
+
+# Check if any snapshots were found
+if [ -z "$SNAPSHOT_IDS" ]; then
+    echo "No snapshots older than $DAYS day(s) found."
+else
+    echo "Found the following snapshots:"
+    echo "$SNAPSHOT_IDS"
+
+    # Iterate over each snapshot and delete it
+    for SNAPSHOT_ID in $SNAPSHOT_IDS; do
+        echo "Attempting to delete snapshot: $SNAPSHOT_ID"
+        aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT_ID"
+        if [ $? -eq 0 ]; then
+            echo "Successfully deleted snapshot: $SNAPSHOT_ID"
+        else
+            echo "Failed to delete snapshot: $SNAPSHOT_ID"
+        fi
+    done
+fi
