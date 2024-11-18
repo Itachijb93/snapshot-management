@@ -10,7 +10,7 @@
 #echo "Filtering snapshots older than: $FILTER_DATE"
 
 # Fetch snapshot IDs older than the filter date
-SNAPSHOT_IDS=$(snap-07badfaa62e99e4c9)
+SNAPSHOT_IDS=snap-07badfaa62e99e4c9
 
 # Check if any snapshots were found
 if [ -z "$SNAPSHOT_IDS" ]; then
