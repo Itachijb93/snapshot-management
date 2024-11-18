@@ -10,14 +10,11 @@
 #echo "Filtering snapshots older than: $FILTER_DATE"
 
 # Fetch snapshot IDs older than the filter date
-SNAPSHOT_IDS=$(aws ec2 describe-snapshots \
-    --filters "Name=start-time,Values='2024-11-18'" \
-    --query "Snapshots[*].SnapshotId" \
-    --output text)
+SNAPSHOT_IDS=$(snap-07badfaa62e99e4c9)
 
 # Check if any snapshots were found
 if [ -z "$SNAPSHOT_IDS" ]; then
-    echo "No snapshots older than today's found."
+    echo "No snapshots were found with the value passed."
 else
     echo "Found the following snapshots:"
     echo "$SNAPSHOT_IDS"
