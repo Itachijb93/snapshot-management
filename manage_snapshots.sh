@@ -11,7 +11,7 @@
 
 # Fetch snapshot IDs older than the filter date
 SNAPSHOT_IDS=$(aws ec2 describe-snapshots \
-    --filters "Name=start-time,Values=='2024-11-18'" \
+    --filters "Name=start-time,Values='2024-11-18'" \
     --query "Snapshots[*].SnapshotId" \
     --output text)
 
