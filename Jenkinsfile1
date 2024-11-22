@@ -15,9 +15,9 @@ pipeline {
             steps {
                 script {
                     // Grant execution permissions to the script
-                    sh 'chmod +x time_based_snapshot_management.sh'
+                    sh 'chmod +x manage_snapshots_on_time.sh'
                     // Execute the script
-                    sh './time_based_snapshot_management.sh'
+                    sh './manage_snapshots_on_time.sh'
                 }
             }
         }
