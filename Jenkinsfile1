@@ -1,55 +1,33 @@
 pipeline {
     agent any
-
     environment {
-        AWS_REGION = 'your-aws-region' // Replace with your AWS region, e.g., 'us-east-1'
-        SCRIPT_FILE = 'time_based_snapshot_management.sh' // Name of the script file
+        AWS_ACCESS_KEY_ID = credentials('awscreds1')  // Replace with Jenkins credentials ID for access key
+        AWS_SECRET_ACCESS_KEY = credentials('awscreds1')  // Replace with Jenkins credentials ID for secret key
+        AWS_DEFAULT_REGION = 'us-east-1'  // Specify the AWS region
     }
-
     stages {
-        stage('Setup') {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Itachijb93/snapshot-management.git'  // Ensure this URL is correct
+            }
+        }
+        stage('Run manage_snapshots_on_time.sh') {
             steps {
                 script {
-                    // Ensure the workspace is clean before starting
-                    cleanWs()
+                    // Grant execution permissions to the script
+                    sh 'chmod +x time_based_snapshot_management.sh'
+                    // Execute the script
+                    sh './time_based_snapshot_management.sh'
                 }
-                echo 'Preparing environment for snapshot management...'
-                sh 'aws --version' // Verify AWS CLI installation
-            }
-        }
-
-        stage('Checkout Code') {
-            steps {
-                echo 'Cloning repository with snapshot script...'
-                git branch: 'main', url: 'https://github.com/YourGitHubRepo/snapshot-management.git'
-            }
-        }
-
-        stage('Prepare Script') {
-            steps {
-                echo 'Making the script executable...'
-                sh 'chmod +x $SCRIPT_FILE' // Make the script executable
-            }
-        }
-
-        stage('Run Snapshot Management') {
-            steps {
-                echo 'Executing the snapshot management script...'
-                sh './$SCRIPT_FILE'
             }
         }
     }
-
     post {
-        success {
-            echo 'Snapshot management completed successfully.'
+        always {
+            echo 'Pipeline execution complete.'
         }
         failure {
-            echo 'Snapshot management failed. Please check the logs for details.'
-        }
-        cleanup {
-            echo 'Cleaning up workspace...'
-            cleanWs() // Optional: Clean workspace after execution
+            echo 'Pipeline failed. Check the logs for details.'
         }
     }
 }
