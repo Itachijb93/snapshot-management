@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'your-aws-region' // Replace with your AWS region, e.g., 'us-east-1'
+        SCRIPT_FILE = 'time_based_snapshot_management.sh' // Name of the script file
+    }
+
+    stages {
+        stage('Setup') {
+            steps {
+                script {
+                    // Ensure the workspace is clean before starting
+                    cleanWs()
+                }
+                echo 'Preparing environment for snapshot management...'
+                sh 'aws --version' // Verify AWS CLI installation
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                echo 'Cloning repository with snapshot script...'
+                git branch: 'main', url: 'https://github.com/YourGitHubRepo/snapshot-management.git'
+            }
+        }
+
+        stage('Prepare Script') {
+            steps {
+                echo 'Making the script executable...'
+                sh 'chmod +x $SCRIPT_FILE' // Make the script executable
+            }
+        }
+
+        stage('Run Snapshot Management') {
+            steps {
+                echo 'Executing the snapshot management script...'
+                sh './$SCRIPT_FILE'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Snapshot management completed successfully.'
+        }
+        failure {
+            echo 'Snapshot management failed. Please check the logs for details.'
+        }
+        cleanup {
+            echo 'Cleaning up workspace...'
+            cleanWs() // Optional: Clean workspace after execution
+        }
+    }
+}
