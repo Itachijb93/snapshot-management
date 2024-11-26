@@ -1,70 +1,50 @@
 #!/bin/bash
 
-# Specify the AWS region
-AWS_REGION="us-east-1"  # Change this to your desired region
+# Set variables
+REGION="us-east-1"  # Replace with your desired AWS region
+DELETE_OLDER_THAN_DAYS=2  # Snapshots older than this will be deleted
+WARN_OLDER_THAN_DAYS=1    # Snapshots older than this will generate a warning
 
-# Set the time thresholds
-DELETE_THRESHOLD_DAYS=2  # Snapshots older than 2 days will be deleted
-WARNING_THRESHOLD_DAYS=1 # Snapshots older than 1 day will get a warning 
+# Function to calculate days between two dates
+calculate_days() {
+    local snapshot_date=$1
+    local current_date=$(date +%Y-%m-%d)
+    echo $(( ( $(date -d "$current_date" +%s) - $(date -d "$snapshot_date" +%s) ) / 86400 ))
+}
 
-# Get the current date in seconds since epoch
-CURRENT_TIME=$(date -u +%s)
+# Fetch all snapshots owned by the account
+SNAPSHOTS=$(aws ec2 describe-snapshots --owner-ids self --query 'Snapshots[*].[SnapshotId,StartTime]' --region "$REGION" --output text)
 
-# Get the AWS account ID
-OWNER_ID=$(aws sts get-caller-identity --query "Account" --output text)
-
-# Log the thresholds and region for debugging
-echo "Region: $AWS_REGION"
-echo "Delete snapshots older than $DELETE_THRESHOLD_DAYS days."
-echo "Warn about snapshots older than $WARNING_THRESHOLD_DAYS day(s)."
-
-# Fetch all snapshots owned by the account in the specified region
-ALL_SNAPSHOTS=$(aws ec2 describe-snapshots \
-    --region "$AWS_REGION" \
-    --owner-ids "$OWNER_ID" \
-    --query "Snapshots[*].[SnapshotId,StartTime]" \
-    --output json)
-
-# Check if any snapshots were returned
-if [ "$(echo "$ALL_SNAPSHOTS" | jq -r '. | length')" -eq 0 ]; then
-    echo "No snapshots found in region $AWS_REGION."
-    exit 0
-fi
-
-# Parse the JSON response
-echo "$ALL_SNAPSHOTS" | jq -c '.[]' | while read SNAPSHOT; do 
-    # Extract snapshot ID and start time
-    SNAPSHOT_ID=$(echo "$SNAPSHOT" | jq -r '.[0]')
-    SNAPSHOT_TIME=$(echo "$SNAPSHOT" | jq -r '.[1]')
-
-    # Convert snapshot start time to seconds since epoch
-    SNAPSHOT_TIME_EPOCH=$(date -d "$SNAPSHOT_TIME" +%s)
-
+# Process each snapshot
+while IFS=$'\t' read -r SNAPSHOT_ID START_TIME; do
+    # Extract the date in YYYY-MM-DD format
+    SNAPSHOT_DATE=$(echo "$START_TIME" | cut -d'T' -f1)
+    
     # Calculate the age of the snapshot in days
-    SNAPSHOT_AGE_DAYS=$(( (CURRENT_TIME - SNAPSHOT_TIME_EPOCH) / 86400 ))
+    SNAPSHOT_AGE=$(calculate_days "$SNAPSHOT_DATE")
 
-    # Verify if the snapshot exists
-    EXISTS=$(aws ec2 describe-snapshots --region "$AWS_REGION" --snapshot-ids "$SNAPSHOT_ID" --query "Snapshots[0].SnapshotId" --output text 2>/dev/null)
+    echo "Snapshot: $SNAPSHOT_ID is $SNAPSHOT_AGE days old."
 
-    if [ "$EXISTS" != "$SNAPSHOT_ID" ]; then
-        echo "Snapshot: $SNAPSHOT_ID does not exist. Skipping."
-        continue
+    # Warn if the snapshot is older than the warning threshold
+    if [[ $SNAPSHOT_AGE -ge $WARN_OLDER_THAN_DAYS && $SNAPSHOT_AGE -lt $DELETE_OLDER_THAN_DAYS ]]; then
+        echo "Warning: Snapshot $SNAPSHOT_ID is $SNAPSHOT_AGE days old. $((DELETE_OLDER_THAN_DAYS - SNAPSHOT_AGE)) day(s) left before deletion."
     fi
 
-    # Logic for handling snapshots based on age
-    if [ "$SNAPSHOT_AGE_DAYS" -ge "$DELETE_THRESHOLD_DAYS" ]; then
-        echo "Deleting snapshot: $SNAPSHOT_ID (Age: $SNAPSHOT_AGE_DAYS days)"
-        aws ec2 delete-snapshot --region "$AWS_REGION" --snapshot-id "$SNAPSHOT_ID"
-        if [ $? -eq 0 ]; then
-            echo "Successfully deleted snapshot: $SNAPSHOT_ID"
+    # Delete if the snapshot is older than the delete threshold
+    if [[ $SNAPSHOT_AGE -ge $DELETE_OLDER_THAN_DAYS ]]; then
+        echo "Deleting snapshot: $SNAPSHOT_ID (Age: $SNAPSHOT_AGE days)"
+        
+        # Attempt to delete the snapshot
+        DELETE_OUTPUT=$(aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT_ID" --region "$REGION" 2>&1)
+        if echo "$DELETE_OUTPUT" | grep -q "InvalidSnapshot.NotFound"; then
+            echo "Error: Snapshot $SNAPSHOT_ID does not exist. Skipping."
+        elif [[ $? -ne 0 ]]; then
+            echo "Error deleting snapshot $SNAPSHOT_ID: $DELETE_OUTPUT"
         else
-            echo "Failed to delete snapshot: $SNAPSHOT_ID"
+            echo "Successfully deleted snapshot: $SNAPSHOT_ID"
         fi
-    elif [ "$SNAPSHOT_AGE_DAYS" -ge "$WARNING_THRESHOLD_DAYS" ]; then
-        REMAINING_DAYS=$((DELETE_THRESHOLD_DAYS - SNAPSHOT_AGE_DAYS))
-        echo "Snapshot: $SNAPSHOT_ID is $SNAPSHOT_AGE_DAYS days old. $REMAINING_DAYS day(s) left to delete."
-    else
-        REMAINING_DAYS=$((DELETE_THRESHOLD_DAYS - SNAPSHOT_AGE_DAYS))
-        echo "Snapshot: $SNAPSHOT_ID is $SNAPSHOT_AGE_DAYS day(s) old. $REMAINING_DAYS day(s) left to delete."
     fi
-done
+
+done <<< "$SNAPSHOTS"
+
+echo "Snapshot management completed."
