@@ -15,8 +15,16 @@ calculate_days() {
 # Fetch all snapshots owned by the account
 SNAPSHOTS=$(aws ec2 describe-snapshots --owner-ids self --query 'Snapshots[*].[SnapshotId,StartTime]' --region "$REGION" --output text)
 
+# Initialize counters
+TOTAL_SNAPSHOTS=0
+DELETE_COUNT=0
+WARN_COUNT=0
+SKIPPED_COUNT=0
+
 # Process each snapshot
 while IFS=$'\t' read -r SNAPSHOT_ID START_TIME; do
+    TOTAL_SNAPSHOTS=$((TOTAL_SNAPSHOTS + 1))
+    
     # Extract the date in YYYY-MM-DD format
     SNAPSHOT_DATE=$(echo "$START_TIME" | cut -d'T' -f1)
     
@@ -25,9 +33,17 @@ while IFS=$'\t' read -r SNAPSHOT_ID START_TIME; do
 
     echo "Snapshot: $SNAPSHOT_ID is $SNAPSHOT_AGE days old."
 
-    # Warn if the snapshot is older than the warning threshold
+    # Handle 0-day-old snapshots
+    if [[ $SNAPSHOT_AGE -eq 0 ]]; then
+        echo "Snapshot $SNAPSHOT_ID is 0 days old. $((DELETE_OLDER_THAN_DAYS - SNAPSHOT_AGE)) day(s) left before deletion."
+        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+        continue
+    fi
+
+    # Warn if the snapshot is older than the warning threshold but not yet for deletion
     if [[ $SNAPSHOT_AGE -ge $WARN_OLDER_THAN_DAYS && $SNAPSHOT_AGE -lt $DELETE_OLDER_THAN_DAYS ]]; then
         echo "Warning: Snapshot $SNAPSHOT_ID is $SNAPSHOT_AGE days old. $((DELETE_OLDER_THAN_DAYS - SNAPSHOT_AGE)) day(s) left before deletion."
+        WARN_COUNT=$((WARN_COUNT + 1))
     fi
 
     # Delete if the snapshot is older than the delete threshold
@@ -42,9 +58,16 @@ while IFS=$'\t' read -r SNAPSHOT_ID START_TIME; do
             echo "Error deleting snapshot $SNAPSHOT_ID: $DELETE_OUTPUT"
         else
             echo "Successfully deleted snapshot: $SNAPSHOT_ID"
+            DELETE_COUNT=$((DELETE_COUNT + 1))
         fi
     fi
 
 done <<< "$SNAPSHOTS"
 
+# Summary
+echo
 echo "Snapshot management completed."
+echo "Total snapshots processed: $TOTAL_SNAPSHOTS"
+echo "Snapshots deleted: $DELETE_COUNT"
+echo "Snapshots warned: $WARN_COUNT"
+echo "Snapshots skipped (0 days old): $SKIPPED_COUNT"
