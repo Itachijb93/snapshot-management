@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Specify the AWS region
+AWS_REGION="us-east-1"  # Change this to your desired region
+
 # Set the time thresholds
 DELETE_THRESHOLD_DAYS=2  # Snapshots older than 2 days will be deleted
 WARNING_THRESHOLD_DAYS=1 # Snapshots older than 1 day will get a warning 
@@ -7,18 +10,20 @@ WARNING_THRESHOLD_DAYS=1 # Snapshots older than 1 day will get a warning
 # Get the current date in seconds since epoch
 CURRENT_TIME=$(date -u +%s)
 
-# Log the thresholds for debugging
+# Log the thresholds and region for debugging
+echo "Region: $AWS_REGION"
 echo "Delete snapshots older than $DELETE_THRESHOLD_DAYS days."
 echo "Warn about snapshots older than $WARNING_THRESHOLD_DAYS day(s)."
 
-# Fetch all snapshots
+# Fetch all snapshots in the specified region
 ALL_SNAPSHOTS=$(aws ec2 describe-snapshots \
+    --region "$AWS_REGION" \
     --query "Snapshots[*].[SnapshotId,StartTime]" \
     --output json)
 
 # Check if any snapshots were returned
 if [ "$(echo "$ALL_SNAPSHOTS" | jq -r '. | length')" -eq 0 ]; then
-    echo "No snapshots found."
+    echo "No snapshots found in region $AWS_REGION."
     exit 0
 fi
 
@@ -37,7 +42,7 @@ echo "$ALL_SNAPSHOTS" | jq -c '.[]' | while read SNAPSHOT; do
     # Logic for handling snapshots based on age
     if [ "$SNAPSHOT_AGE_DAYS" -ge "$DELETE_THRESHOLD_DAYS" ]; then
         echo "Deleting snapshot: $SNAPSHOT_ID (Age: $SNAPSHOT_AGE_DAYS days)"
-        aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT_ID"
+        aws ec2 delete-snapshot --region "$AWS_REGION" --snapshot-id "$SNAPSHOT_ID"
         if [ $? -eq 0 ]; then
             echo "Successfully deleted snapshot: $SNAPSHOT_ID"
         else
