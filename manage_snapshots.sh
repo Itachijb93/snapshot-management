@@ -10,14 +10,18 @@ WARNING_THRESHOLD_DAYS=1 # Snapshots older than 1 day will get a warning
 # Get the current date in seconds since epoch
 CURRENT_TIME=$(date -u +%s)
 
+# Get the AWS account ID
+OWNER_ID=$(aws sts get-caller-identity --query "Account" --output text)
+
 # Log the thresholds and region for debugging
 echo "Region: $AWS_REGION"
 echo "Delete snapshots older than $DELETE_THRESHOLD_DAYS days."
 echo "Warn about snapshots older than $WARNING_THRESHOLD_DAYS day(s)."
 
-# Fetch all snapshots in the specified region
+# Fetch all snapshots owned by the account in the specified region
 ALL_SNAPSHOTS=$(aws ec2 describe-snapshots \
     --region "$AWS_REGION" \
+    --owner-ids "$OWNER_ID" \
     --query "Snapshots[*].[SnapshotId,StartTime]" \
     --output json)
 
@@ -38,6 +42,14 @@ echo "$ALL_SNAPSHOTS" | jq -c '.[]' | while read SNAPSHOT; do
 
     # Calculate the age of the snapshot in days
     SNAPSHOT_AGE_DAYS=$(( (CURRENT_TIME - SNAPSHOT_TIME_EPOCH) / 86400 ))
+
+    # Verify if the snapshot exists
+    EXISTS=$(aws ec2 describe-snapshots --region "$AWS_REGION" --snapshot-ids "$SNAPSHOT_ID" --query "Snapshots[0].SnapshotId" --output text 2>/dev/null)
+
+    if [ "$EXISTS" != "$SNAPSHOT_ID" ]; then
+        echo "Snapshot: $SNAPSHOT_ID does not exist. Skipping."
+        continue
+    fi
 
     # Logic for handling snapshots based on age
     if [ "$SNAPSHOT_AGE_DAYS" -ge "$DELETE_THRESHOLD_DAYS" ]; then
