@@ -12,6 +12,7 @@ pipeline {
             steps {
                 echo "Cloning the snapshot management repository..."
                 git branch: 'main', url: 'https://github.com/Itachijb93/snapshot-management.git' // Replace with your GitHub repo URL
+                sh 'ls -l'  // List the files in the workspace to confirm the file is present
             }
         }
 
