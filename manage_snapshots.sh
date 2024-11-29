@@ -17,7 +17,7 @@ TODAY_COUNT=0
 # Process snapshots
 echo "Processing snapshots..."
 while read -r SNAPSHOT_ID START_TIME; do
-    TOTAL_SNAPSHOTS=$((TOTAL_SNAPSHOTS + 1))
+    TOTAL_SNAPSHOTS=$((TOTAL_SNAPSHOTS ))
     
     # Parse the start time into days
     START_DATE=$(echo $START_TIME | cut -d'T' -f1)
@@ -28,18 +28,18 @@ while read -r SNAPSHOT_ID START_TIME; do
         echo "Deleting snapshot: $SNAPSHOT_ID (Created: $START_DATE)"
         aws ec2 delete-snapshot --snapshot-id $SNAPSHOT_ID --region $AWS_REGION
         if [ $? -eq 0 ]; then
-            DELETE_COUNT=$((DELETE_COUNT + 1))
+            DELETE_COUNT=$((DELETE_COUNT ))
         else
             echo "Error deleting snapshot: $SNAPSHOT_ID"
         fi
     elif [ $SNAPSHOT_AGE -eq 2 ]; then
         # Snapshots 1 day younger than 2 days
         echo "Snapshot $SNAPSHOT_ID (Created: $START_DATE) will be deleted tomorrow."
-        TOMORROW_COUNT=$((TOMORROW_COUNT + 1))
+        TOMORROW_COUNT=$((TOMORROW_COUNT ))
     elif [ $SNAPSHOT_AGE -eq 0 ]; then
         # Snapshots created today
         echo "Snapshot $SNAPSHOT_ID (Created: $START_DATE) will be deleted in 2 days."
-        TODAY_COUNT=$((TODAY_COUNT + 1))
+        TODAY_COUNT=$((TODAY_COUNT ))
     fi
 done <<< "$ALL_SNAPSHOTS"
 
