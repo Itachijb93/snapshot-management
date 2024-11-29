@@ -15,7 +15,7 @@ pipeline {
             }
         }
 
-        stage('Set Permissions') {
+        stage('Run manage_snapshots_by_time.sh') {
             steps {
                 echo "Setting execute permissions for the script..."
                 sh 'chmod +x manage_snapshots_by_time.sh'
