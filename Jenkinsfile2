@@ -19,7 +19,7 @@ pipeline {
         stage('Run manage_snapshots_by_time.sh') {
             steps {
                 echo "Setting execute permissions for the script..."
-                sh 'chmod +x manage_snapshots_by_time.sh'
+                sh 'sudo chmod +x manage_snapshots_by_time.sh'
             }
         }
 
