@@ -1,1 +1,39 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'us-east-1' // Replace with your AWS region
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                echo "Cloning the snapshot management repository..."
+                git branch: 'main', url: 'https://github.com/your-repository.git' // Replace with your GitHub repo URL
+            }
+        }
+
+        stage('Set Permissions') {
+            steps {
+                echo "Setting execute permissions for the script..."
+                sh 'chmod +x manage_snapshots_by_time.sh'
+            }
+        }
+
+        stage('Execute Snapshot Management') {
+            steps {
+                echo "Executing the snapshot management script..."
+                sh './manage_snapshots_by_time.sh'
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline execution completed."
+            echo "Cleaning up the workspace..."
+            deleteDir()
+        }
+    }
+}
 
