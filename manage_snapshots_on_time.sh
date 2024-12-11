@@ -4,7 +4,7 @@
 # This script manages AWS EC2 snapshots based on their age.
 # Snapshots older than a specified threshold (in minutes)
 # will be deleted automatically.
-# --------------------------------------------------------
+# ----------------------------------------------------------
 
 # Set the time threshold in minutes
 DELETE_THRESHOLD_MINUTES=10  # Snapshots older than this value will be deleted
