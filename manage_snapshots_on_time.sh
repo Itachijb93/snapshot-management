@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# --------------------------------------------------------
+# ----------------------------------------------------------
 # This script manages AWS EC2 snapshots based on their age.
 # Snapshots older than a specified threshold (in minutes)
 # will be deleted automatically.
